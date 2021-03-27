@@ -13,23 +13,24 @@ void test(NeuralNetwork& net) {
 	cout << "Testing:" << endl;
 
 	RowVector input(3), output(3);
-	for (int num = 0; num < 8; num++) {
-		input.coeffRef(0) = (num >> 2) & 1;
-		input.coeffRef(1) = (num >> 1) & 1;
-		input.coeffRef(2) = num & 1;
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (int num = 0; num < 8; num++) {
+			input.coeffRef(0) = (num >> 2) & 1;
+			input.coeffRef(1) = (num >> 1) & 1;
+			input.coeffRef(2) = num & 1;
 
-		output.coeffRef(0) = ((num + 1) >> 2) & 1;
-		output.coeffRef(1) = ((num + 1) >> 1) & 1;
-		output.coeffRef(2) = (num + 1) & 1;
+			output.coeffRef(0) = ((num + 1) >> 2) & 1;
+			output.coeffRef(1) = ((num + 1) >> 1) & 1;
+			output.coeffRef(2) = (num + 1) & 1;
 
-		net.test(input, output);
+			net.test(input, output);
 
-		double mse = net.mse();
-		cout << "In [" << input << "] "
-			<< " Desired [" << output << "] "
-			<< " Out [" << net.mNeurons.back()->unaryExpr(ptr_fun(unary)) << "] "
-			<< " MSE [" << mse << "]" << endl;
-	}
+			double mse = net.mse();
+			cout << "In [" << input << "] "
+				<< " Desired [" << output << "] "
+				<< " Out [" << net.mNeurons.back()->unaryExpr(ptr_fun(unary)) << "] "
+				<< " MSE [" << mse << "]" << endl;
+		}
 }
 
 void train(NeuralNetwork& net) {

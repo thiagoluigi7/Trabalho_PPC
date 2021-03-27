@@ -103,29 +103,34 @@ void NeuralNetwork::confusionMatrix(RowVector*& precision, RowVector*& recall) {
 	int cols = (int)mConfusion->cols();
 		
 	precision = new RowVector(cols);
-	for (int col = 0; col < cols; col++) {
-		double colSum = 0;
-		for (int row = 0; row < rows; row++)
-			colSum += mConfusion->coeffRef(row, col);
-		precision->coeffRef(col) = mConfusion->coeffRef(col, col) / colSum;
-	}
+
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (int col = 0; col < cols; col++) {
+			double colSum = 0;
+			for (int row = 0; row < rows; row++)
+				colSum += mConfusion->coeffRef(row, col);
+			precision->coeffRef(col) = mConfusion->coeffRef(col, col) / colSum;
+		}
 	
 	recall = new RowVector(rows);
-	for (int row = 0; row < rows; row++) {
-		double rowSum = 0;
-		for (int col = 0; col < cols; col++)
-			rowSum += mConfusion->coeffRef(row, col);
-		recall->coeffRef(row) = mConfusion->coeffRef(row, row) / rowSum;
-	}
+
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (int row = 0; row < rows; row++) {
+			double rowSum = 0;
+			for (int col = 0; col < cols; col++)
+				rowSum += mConfusion->coeffRef(row, col);
+			recall->coeffRef(row) = mConfusion->coeffRef(row, row) / rowSum;
+		}
 	
 	// convert confusion to percentage 
-	for (int row = 0; row < rows; row++) {
-		double rowSum = 0;
-		for (int col = 0; col < cols; col++)
-			rowSum += mConfusion->coeffRef(row, col);
-		for (int col = 0; col < cols; col++)
-			mConfusion->coeffRef(row, col) = mConfusion->coeffRef(row, col) * 100 / rowSum;
-	}
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (int row = 0; row < rows; row++) {
+			double rowSum = 0;
+			for (int col = 0; col < cols; col++)
+				rowSum += mConfusion->coeffRef(row, col);
+			for (int col = 0; col < cols; col++)
+				mConfusion->coeffRef(row, col) = mConfusion->coeffRef(row, col) * 100 / rowSum;
+		}
 }
 
 
@@ -134,20 +139,22 @@ void NeuralNetwork::backward(RowVector& output) {
 	*mErrors.back() = output - *mNeurons.back();
 
 	// calculate hidden layers' errors (vector multiplication)
-	for (size_t i = mErrors.size() - 2; i > 0; i--)
-		*mErrors[i] = *mErrors[i + 1] * mWeights[i]->transpose();
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (size_t i = mErrors.size() - 2; i > 0; i--)
+			*mErrors[i] = *mErrors[i + 1] * mWeights[i]->transpose();
 
 	// update weights
 	size_t size = mWeights.size();
-	for (size_t i = 0; i < size; i++)
-		for (int col = 0, cols = (int)mWeights[i]->cols(); col < cols; col++)
-			for (int row = 0; row < mWeights[i]->rows(); row++) {
-				mWeights[i]->coeffRef(row, col) +=
-					mLearningRate *
-					mErrors[i + 1]->coeffRef(col) *
-					activationDerivative(mNeurons[i + 1]->coeffRef(col)) *
-					mNeurons[i]->coeffRef(row);
-			}
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (size_t i = 0; i < size; i++)
+			for (int col = 0, cols = (int)mWeights[i]->cols(); col < cols; col++)
+				for (int row = 0; row < mWeights[i]->rows(); row++) {
+					mWeights[i]->coeffRef(row, col) +=
+						mLearningRate *
+						mErrors[i + 1]->coeffRef(col) *
+						activationDerivative(mNeurons[i + 1]->coeffRef(col)) *
+						mNeurons[i]->coeffRef(row);
+				}
 }
 
 void NeuralNetwork::train(RowVector& input, RowVector& output) {
@@ -167,9 +174,10 @@ int NeuralNetwork::vote(double& value) {
 
 int NeuralNetwork::vote(RowVector& v, double& value) {
 	int index = 0;
-	for (int i = 1; i < v.cols(); i++)
-		if (v[i] > v[index])
-			index = i;
+	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
+		for (int i = 1; i < v.cols(); i++)
+			if (v[i] > v[index])
+				index = i;
 	value = v[index];
 	return index;
 }
