@@ -15,31 +15,32 @@ NeuralNetwork::~NeuralNetwork() {
 
 NeuralNetwork::NeuralNetwork(
 	vector<int> architecture,
-	double learningRate /*= LEARNING_RATE*/,
-	Activation activation /*= TANH*/) {
+	double learningRate, //Taxa de aprendizado
+	Activation activation) { // Por padrão é utilizada a tangente hiperbólica
 	init(architecture, learningRate, activation);
 }
 
 void NeuralNetwork::init(
 	vector<int> architecture,
-	double learningRate /*= LEARNING_RATE*/,
-	Activation activation/*= TANH*/) {
+	double learningRate,
+	Activation activation) {
 	mArchitecture = architecture;
 	mLearningRate = learningRate;
 	mActivation = activation;
 
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
 		for (unsigned int i = 0; i < architecture.size(); i++) {
-			// add extra neuron to each layer as a bias (with weight = 1)
+			// Adiciona um neurônio extra a cada camada como viés (com peso = 1)
 			int size = architecture[i] + (i != architecture.size() - 1);
 			mNeurons.push_back(new RowVector(size));
 			mErrors.push_back(new RowVector(size));
 
 			if (i < architecture.size() - 1)
-				// set bias multiplyer to 1 (used in vectors dot product)
+				// Define o multiplicador do viés como 1
 				mNeurons.back()->coeffRef(architecture[i]) = 1.0;
 
-			// initialize weights
+
+			// Inicializa os pesos
 			if (i > 0) {
 				mWeights.push_back(new Matrix(architecture[i - 1] + 1, size));
 				mWeights.back()->setRandom();
@@ -65,15 +66,19 @@ double NeuralNetwork::activationDerivative(double x) {
 }
 
 void NeuralNetwork::forward(RowVector& input) {
-	// set first layer input
+
+	// Define a entrada da primeira camada
 	mNeurons.front()->block(0, 0, 1, input.size()) = input;
 
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
-		// propagate forward (vector multiplication)
+
+		// Propaga adiante (multiplicação de vetor)
 		for (unsigned int i = 1; i < mArchitecture.size(); i++) {
-			// copy values ingoring last neuron as it is a bias
+
+			// Copia os valores ignorando o último neurônio porque ele é de viés
 			mNeurons[i]->block(0, 0, 1, mArchitecture[i]) = (*mNeurons[i - 1] * *mWeights[i - 1]).block(0, 0, 1, mArchitecture[i]);
-			// apply activation function
+
+			// Aplica a função de ativação
 			for (int col = 0; col < mArchitecture[i]; col++)
 				mNeurons[i]->coeffRef(col) = activation(mNeurons[i]->coeffRef(col));
 		}
@@ -81,7 +86,8 @@ void NeuralNetwork::forward(RowVector& input) {
 
 void NeuralNetwork::test(RowVector& input, RowVector& output) {
 	forward(input);
-	// calculate last layer errors
+
+	// Calcula os erros da última camada
 	*mErrors.back() = output - *mNeurons.back();
 }
 
@@ -122,7 +128,8 @@ void NeuralNetwork::confusionMatrix(RowVector*& precision, RowVector*& recall) {
 			recall->coeffRef(row) = mConfusion->coeffRef(row, row) / rowSum;
 		}
 	
-	// convert confusion to percentage 
+
+	// Converte a confusão (da matrix de confusão) para porcentagem
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
 		for (int row = 0; row < rows; row++) {
 			double rowSum = 0;
@@ -135,15 +142,17 @@ void NeuralNetwork::confusionMatrix(RowVector*& precision, RowVector*& recall) {
 
 
 void NeuralNetwork::backward(RowVector& output) {
-	// calculate last layer errors
+
+	// Calcula os erros da última camada
 	*mErrors.back() = output - *mNeurons.back();
 
-	// calculate hidden layers' errors (vector multiplication)
+	// Calcula os erros das camadas ocultas (multiplicação de vetores)
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
 		for (size_t i = mErrors.size() - 2; i > 0; i--)
 			*mErrors[i] = *mErrors[i + 1] * mWeights[i]->transpose();
 
-	// update weights
+
+	// Atualiza os pesos
 	size_t size = mWeights.size();
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
 		for (size_t i = 0; i < size; i++)
@@ -162,7 +171,7 @@ void NeuralNetwork::train(RowVector& input, RowVector& output) {
 	backward(output);
 }
 
-// mean square error
+// Erro quadrático médio
 double NeuralNetwork::mse() {
 	return sqrt((*mErrors.back()).dot((*mErrors.back())) / mErrors.back()->size());
 }
@@ -215,7 +224,7 @@ bool NeuralNetwork::load(const char* filename) {
 		return false;
 	stringstream lr(line);
 
-	// read learning rate
+	// Lê a taxa de aprendizado
 	getline(lr, name, ':');
 	if (name != "learningRate")
 		return false;
@@ -223,7 +232,7 @@ bool NeuralNetwork::load(const char* filename) {
 		return false;
 	mLearningRate = atof(value.c_str());
 
-	// read topoplogy
+	// Lê a topologia
 	getline(file, line, '\n');
 	stringstream ss(line);
 	getline(ss, name, ':');
@@ -232,7 +241,7 @@ bool NeuralNetwork::load(const char* filename) {
 	while (getline(ss, value, ','))
 		mArchitecture.push_back(atoi(value.c_str()));
 
-	// read activation
+	// Lê a ativação
 	getline(file, line, '\n');
 	stringstream sss(line);
 	getline(sss, name, ':');
@@ -242,10 +251,10 @@ bool NeuralNetwork::load(const char* filename) {
 		return false;
 	mActivation = (Activation)atoi(value.c_str());
 
-	// initialize using read architecture
+	// Inicializa usando a arquitetura lida
 	init(mArchitecture, mLearningRate, mActivation);
 
-	// read weights
+	// Lê os pesos
 	getline(file, line, '\n');
 	stringstream we(line);
 	getline(we, name, ':');

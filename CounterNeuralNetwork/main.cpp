@@ -1,4 +1,4 @@
-// main.cpp : This file contains the 'main' function. Program execution begins and ends there.
+// main.cpp : Este arquivo contém a função 'main'. A execução do programa começa e termina aqui.
 //
 
 #include <iostream>
@@ -10,7 +10,7 @@ double unary(double x) {
 }
 
 void test(NeuralNetwork& net) {
-	cout << "Testing:" << endl;
+	cout << "Testando:" << endl;
 
 	RowVector input(3), output(3);
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
@@ -26,15 +26,15 @@ void test(NeuralNetwork& net) {
 			net.test(input, output);
 
 			double mse = net.mse();
-			cout << "In [" << input << "] "
-				<< " Desired [" << output << "] "
-				<< " Out [" << net.mNeurons.back()->unaryExpr(ptr_fun(unary)) << "] "
-				<< " MSE [" << mse << "]" << endl;
+			cout << "Entrada [" << input << "] "
+				<< " Esperado [" << output << "] "
+				<< " Saída [" << net.mNeurons.back()->unaryExpr(ptr_fun(unary)) << "] "
+				<< " MSE [" << mse << "]" << endl; // Mean Square Error
 		}
 }
 
 void train(NeuralNetwork& net) {
-	cout << "Training:" << endl;
+	cout << "Treinando:" << endl;
 	RowVector input(3), output(3);
 	int stop = 0;
 	#pragma omp parallel for firstprivate(x) private(i)  num_threads(2)
@@ -51,9 +51,9 @@ void train(NeuralNetwork& net) {
 
 				net.train(input, output);
 				double mse = net.mse();
-				cout << "In [" << input << "] "
-					<< " Desired [" << output << "] "
-					<< " Out [" << net.mNeurons.back()->unaryExpr(ptr_fun(unary)) << "] "
+				cout << "Entrada [" << input << "] "
+					<< " Desejado [" << output << "] "
+					<< " Saída [" << net.mNeurons.back()->unaryExpr(ptr_fun(unary)) << "] "
 					<< " MSE [" << mse << "]" << endl;
 				stop = mse < 0.1 ? stop + 1 : 0;
 			}
@@ -67,10 +67,10 @@ int main() {
 	test(net);
 	net.save("params.txt");
 
-	cout << endl << "Neurons:" << endl;
+	cout << endl << "Neurônios:" << endl;
 	for(int i = 0; i < net.mNeurons.size(); i++)
 		cout << *net.mNeurons[i] << endl;
-	cout << endl << "Weights:" << endl;
+	cout << endl << "Pesos:" << endl;
 	for (int i = 0; i < net.mWeights.size(); i++)
 		cout << *net.mWeights[i] << endl;
 
